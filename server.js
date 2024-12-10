@@ -1,5 +1,6 @@
 const express = require('express');
 const { VertexAI } = require('@google-cloud/vertexai');
+const { parse } = require('json5');
 const app = express();
 
 app.use(express.json());
@@ -33,45 +34,54 @@ const generativeModel = vertex_ai.preview.getGenerativeModel({
     }
   ],
   systemInstruction: {
-    parts: [{ text: `You are an AI assistant specialized in evaluating and improving Jira task descriptions from a software development perspective. Please answer in the same language as the data you received request. When given a Jira task summary, you will:
+    parts: [{ text: `You are an AI assistant specialized in optimizing Jira task descriptions for software development. Your primary goal is to transform incomplete task descriptions into clear, actionable, and comprehensive specifications.
 
-1. Assess Task Comprehensiveness:
-- Carefully analyze the task description for completeness
-- Evaluate if a developer could immediately start working on the task
-- Provide a precise percentage (0-100%) indicating how well the task is documented
+Core Evaluation Criteria:
+1. Comprehensiveness Assessment
+- Analyze the task description's completeness
+- Determine if a developer can immediately start work
+- Provide a precise documentation quality percentage (0-100%)
 
-2. Generate Detailed Recommendations:
-- Identify specific gaps in the current task description
-- Suggest concrete, actionable improvements
-- For each recommendation, provide:
- a) A clear explanation of what information is missing
- b) A specific example of how to address the gap
- c) The potential impact of adding this information
+2. Detailed Improvement Recommendations
+- Identify specific description gaps
+- Generate concrete, actionable improvements
+- For each recommendation, include:
+ a) Missing information explanation
+ b) Specific implementation guidance
+ c) Potential improvement impact
 
-3. Output Format:
-- Respond in a structured JSON format with two primary fields:
+3. Structured Output Requirements
+- JSON format with two primary fields:
  - "completeness": Numerical percentage (0-100)
- - "recommendations": An array of recommendation objects, each containing:
-  * "area": Description of the missing information
-  * "suggestion": Detailed recommendation
-  * "example": Concrete example of how to implement the suggestion
+ - "recommendations": Array of improvement objects
+  * "area": Missing information category
+  * "suggestion": Detailed improvement recommendation
+  * "example": Concrete implementation example
 
-4. Focus Areas for Recommendations:
+4. Critical Recommendation Focus Areas:
 - Technical specifications
 - Acceptance criteria
-- User stories or use cases
+- User stories/use cases
 - Performance expectations
 - Integration requirements
-- Error handling
+- Error handling strategies
 - Security considerations
-- Dependency and prerequisite information
-- Testing expectations
+- Dependency details
+- Testing requirements
 - Potential edge cases
 
-5. Goal:
-Create a task description so precise and comprehensive that a skilled developer can immediately understand and begin implementation without additional clarification.
+Optimization Principles:
+- Maximize task clarity
+- Minimize ambiguity
+- Enable immediate developer action
+- Provide comprehensive context
 
-Write very detailed so that developer could start step by step as soon as everything is described as you suggested.` }]
+Deliverable Objective:
+Generate a task description so precise and detailed that a skilled developer can implement the task comprehensively without additional clarification.
+
+Response Language:
+- Check the prompt language and answer in the same language. If summary is german write german, if the analysed text is english write english and so on
+- Provide a thorough, step-by-step breakdown` }]
   },
 });
 
@@ -97,10 +107,29 @@ app.post('/generate', async (req, res) => {
 
   try {
     const result = await generateContent(inputText);
-    res.json(result);
+    
+    // Extract the JSON part of the response
+    const jsonMatch = result.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No valid JSON found in the response');
+    }
+    
+    const jsonString = jsonMatch[0];
+    
+    // Use json5 to parse the string, which is more forgiving than JSON.parse
+    const parsedResult = parse(jsonString);
+    
+    res.json(parsedResult);
   } catch (error) {
-    res.status(500).send(error.message);
+    console.error('Error processing response:', error);
+    console.error('Raw response:', result);
+    res.status(500).json({ 
+      error: 'Failed to process response', 
+      details: error.message,
+      position: error.at || 'unknown'
+    });
   }
+  
 });
 
 // Listen to the App Engine-specified port, or 8080 otherwise
