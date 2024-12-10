@@ -85,20 +85,63 @@ Response Language:
   },
 });
 
-async function generateContent(inputText) {
+const languageDetectionModel = vertex_ai.preview.getGenerativeModel({
+  model: model,
+  generationConfig: {
+    maxOutputTokens: 8192,
+    temperature
+    : 1,
+    topP: 0.95,
+  },
+  safetySettings: [
+    {
+      category: 'HARM_CATEGORY_HATE_SPEECH',
+      threshold: 'OFF',
+    },
+    {
+      category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+      threshold: 'OFF',
+    },
+    {
+      category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+      threshold: 'OFF',
+    },
+    {
+      category: 'HARM_CATEGORY_HARASSMENT',
+      threshold: 'OFF',
+    }
+  ],
+  systemInstruction: {
+    parts: [{ text: `Tell me the language of the text.` }]
+  },
+});
+
+async function detectLanguage(inputText) {
   const req = {
     contents: [
       { role: 'user', parts: [{ text: inputText }] }
     ],
   };
 
+  const streamingResp = await languageDetectionModel.generateContentStream(req);
+  let language = (await streamingResp.response).candidates[0].content.parts[0].text.trim();
+  return language;
+}
+
+async function generateContent(inputText) {
+  const language = await detectLanguage(inputText);
+
+  const req = {
+    contents: [
+      { role: 'user', parts: [{ text: `${inputText}\n\nPlease answer in this language:${language}. everything. area suggestion and example ` }] }
+    ],
+  };
+
   const streamingResp = await generativeModel.generateContentStream(req);
 
   let result = '';
- 
-
-let content =(await streamingResp.response).candidates[0].content.parts[0].text;
- return content;
+  let content = (await streamingResp.response).candidates[0].content.parts[0].text;
+  return content;
   return JSON.stringify(content);
 }
 
