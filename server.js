@@ -129,20 +129,24 @@ async function detectLanguage(inputText) {
 }
 
 async function generateContent(inputText) {
-  const language = await detectLanguage(inputText);
+  try {
+    const language = await detectLanguage(inputText);
 
-  const req = {
-    contents: [
-      { role: 'user', parts: [{ text: `${inputText}\n\nPlease answer in this language:${language}. everything. area suggestion and example ` }] }
-    ],
-  };
+    const req = {
+      contents: [
+        { role: 'user', parts: [{ text: `${inputText}\n\nPlease answer in this language:${language}. everything. area suggestion and example ` }] }
+      ],
+    };
 
-  const streamingResp = await generativeModel.generateContentStream(req);
+    const streamingResp = await generativeModel.generateContentStream(req);
 
-  let result = '';
-  let content = (await streamingResp.response).candidates[0].content.parts[0].text;
-  return content;
-  return JSON.stringify(content);
+    let result = '';
+    let content = (await streamingResp.response).candidates[0].content.parts[0].text;
+    return content;
+  } catch (error) {
+    console.error('Error generating content:', error);
+    return JSON.stringify({ error: 'Failed to generate content', details: error.message });
+  }
 }
 
 app.post('/generate', async (req, res) => {
